@@ -9,41 +9,65 @@ REPORT_PATH = Path("security-reports/security-report.json")
 def main():
     if not REPORT_PATH.exists():
         print("ERROR: Security report not found.")
-        sys.exit(1)
+        sys.exit(2)
 
-    with REPORT_PATH.open("r", encoding="utf-8") as file:
-        report = json.load(file)
+    try:
+        with REPORT_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+            report = json.load(file)
+    except Exception as error:
+        print(f"ERROR: Cannot read security report: {error}")
+        sys.exit(2)
 
-    summary = report.get("summary", {})
+    ib_summary = report.get("ib_summary", {})
 
-    critical = summary.get("critical", 0)
-    high = summary.get("high", 0)
-    medium = summary.get("medium", 0)
-    low = summary.get("low", 0)
+    violations = ib_summary.get("violations", 0)
+    parse_errors = ib_summary.get("parse_errors", 0)
 
     print("========================================")
     print("          KMG SECURITY GATE")
     print("========================================")
     print()
-    print(f"Critical: {critical}")
-    print(f"High:     {high}")
-    print(f"Medium:   {medium}")
-    print(f"Low:      {low}")
+
+    print(
+        f"ИБ requirements: {ib_summary.get('total_requirements', 0)}"
+    )
+    print(
+        f"ИБ PASS:         {ib_summary.get('passed', 0)}"
+    )
+    print(
+        f"ИБ VIOLATIONS:   {violations}"
+    )
+    print(
+        f"Parse errors:    {parse_errors}"
+    )
+
     print()
 
-    if critical > 0:
-        print("STATUS: BLOCKED")
-        print("Reason: Critical security findings detected.")
-        sys.exit(1)
+    for requirement in report.get("requirements", []):
+        print(
+            f"{requirement.get('requirement_id')}: "
+            f"{requirement.get('status')}"
+        )
 
-    if high > 0:
+    print()
+
+    if parse_errors > 0:
+        print("STATUS: EMERGENCY")
+        print("Reason: Project parse errors.")
+        sys.exit(2)
+
+    if violations > 0:
         print("STATUS: BLOCKED")
-        print("Reason: High-risk security findings detected.")
+        print(
+            "Reason: Information security violations detected."
+        )
         sys.exit(1)
 
     print("STATUS: PASSED")
-    print("No Critical or High risk findings detected.")
-
+    print("No information security violations detected.")
     sys.exit(0)
 
 
