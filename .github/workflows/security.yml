@@ -12,6 +12,11 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
 
+    env:
+      AI_PROVIDER: openrouter
+      AI_MODEL: qwen/qwen3.8-27b:free
+      AI_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

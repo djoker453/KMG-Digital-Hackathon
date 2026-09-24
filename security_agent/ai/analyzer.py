@@ -1,31 +1,41 @@
+import os
 from pathlib import Path
 
 from dotenv import dotenv_values
 from openai import OpenAI
 
 
-# Находим .env в корне проекта
 BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
 
-# Читаем .env напрямую
 ENV = dotenv_values(ENV_FILE)
 
-AI_PROVIDER = ENV.get("AI_PROVIDER", "deepseek")
-AI_API_KEY = ENV.get("AI_API_KEY")
-AI_MODEL = ENV.get("AI_MODEL", "deepseek-chat")
+AI_PROVIDER = os.getenv(
+    "AI_PROVIDER",
+    ENV.get("AI_PROVIDER", "openrouter"),
+)
+
+AI_API_KEY = os.getenv(
+    "AI_API_KEY",
+    ENV.get("AI_API_KEY"),
+)
+
+AI_MODEL = os.getenv(
+    "AI_MODEL",
+    ENV.get("AI_MODEL", "qwen/qwen3.8-27b:free"),
+)
 
 
 def analyze_finding(finding):
     """
-    Отправляет одну находку Semgrep в AI
-    и получает объяснение риска.
+    Анализирует одну находку Semgrep
+    с помощью Qwen через OpenRouter.
     """
 
     if not AI_API_KEY:
         return {
             "success": False,
-            "error": "AI_API_KEY не указан в .env",
+            "error": "AI_API_KEY не указан.",
         }
 
     if AI_PROVIDER == "openrouter":
@@ -33,6 +43,9 @@ def analyze_finding(finding):
 
     elif AI_PROVIDER == "deepseek":
         base_url = "https://api.deepseek.com"
+
+    elif AI_PROVIDER == "qwen":
+        base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     else:
         return {
