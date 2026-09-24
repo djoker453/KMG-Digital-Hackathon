@@ -19,7 +19,7 @@ def manage_required(view):
     @login_required
     @wraps(view)
     def wrapped(request, *args, **kwargs):
-        if not request.user.is_staff: raise PermissionDenied
+        if not administrator(request.user): raise PermissionDenied
         return view(request, *args, **kwargs)
     return wrapped
 

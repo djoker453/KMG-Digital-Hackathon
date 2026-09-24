@@ -1,38 +1,66 @@
-import json
-from pathlib import Path
+import sys
+from datetime import datetime, timezone
 
 from security_agent.scanners.semgrep import run_semgrep
+from security_agent.checks.runner import (
+    run_all_checks,
+    build_summary as build_ib_summary,
+)
 from security_agent.risk.analyzer import analyze_findings
 from security_agent.ai.analyzer import analyze_finding
+from security_agent.report.generator import generate_report
 
 
-def run_security_analysis(target="."):
+def run_security_analysis(
+    target=".",
+    use_ai=True,
+    report_dir="/tmp/kmg-security-reports",
+    start_time = datetime.now(timezone.utc)
+):
+
     print("========================================")
     print("      KMG SECURITY AI AGENT")
     print("========================================")
     print()
 
-    # ========================================
-    # 1. SEMGREP
-    # ========================================
+    print("[0/4] Проверка требований ИБ-01 ... ИБ-08...")
 
+    ib_results = run_all_checks(target)
+    ib_summary = build_ib_summary(ib_results)
+
+    print(
+        f"Проверка ИБ завершена: "
+        f"{ib_summary['passed']} PASS, "
+        f"{ib_summary['violations']} VIOLATION, "
+        f"{ib_summary['parse_errors']} PARSE ERRORS"
+    )
+
+    print()
+
+    for result in ib_results:
+        print(
+            f"  {result['requirement_id']}: "
+            f"{result['status']} "
+            f"({len(result['violations'])} нарушений)"
+        )
+
+    print()
     print("[1/4] Запуск Semgrep...")
 
-    semgrep_result = run_semgrep(target)
+    semgrep_result = run_semgrep(
+    target,
+    report_dir=report_dir,
+)
 
     if not semgrep_result["success"]:
         print("Ошибка Semgrep:")
         print(semgrep_result.get("error"))
-        return False
+        return 2
 
     print(
         f"Semgrep завершён. "
         f"Найдено: {semgrep_result['findings_count']}"
     )
-
-    # ========================================
-    # 2. RISK ENGINE
-    # ========================================
 
     print()
     print("[2/4] Анализ уровня риска...")
@@ -52,129 +80,142 @@ def run_security_analysis(target="."):
     print(f"  Medium:   {summary['medium']}")
     print(f"  Low:      {summary['low']}")
 
-    # ========================================
-    # 3. QWEN AI ANALYSIS
-    # ========================================
-
     print()
-    print("[3/4] AI-анализ Qwen...")
 
-    findings = risk_result["findings"]
+    if use_ai:
+        print("[3/4] AI-анализ Qwen...")
 
-    # Выбираем только HIGH и MEDIUM
-    ai_findings = [
-        finding
-        for finding in findings
-        if finding["risk"] in ["HIGH", "MEDIUM"]
-    ]
+        findings = risk_result["findings"]
 
-    # Бесплатный API имеет ограничение запросов.
-    # За один запуск анализируем максимум 3 находки.
-    max_ai_requests = 3
-    ai_findings = ai_findings[:max_ai_requests]
+        ai_findings = [
+            finding
+            for finding in findings
+            if finding["risk"] in ["HIGH", "MEDIUM"]
+        ]
 
-    print(
-        f"В AI будет отправлено максимум: "
-        f"{len(ai_findings)}"
-    )
+        max_ai_requests = 3
+        ai_findings = ai_findings[:max_ai_requests]
 
-    for index, finding in enumerate(ai_findings, start=1):
-        print()
         print(
-            f"AI анализ {index}/{len(ai_findings)}:"
+            f"В AI будет отправлено максимум: "
+            f"{len(ai_findings)}"
         )
-        print(f"  Rule: {finding['rule']}")
-        print(f"  File: {finding['file']}")
-        print(f"  Line: {finding['line']}")
-        print(f"  Risk: {finding['risk']}")
 
-        ai_result = analyze_finding(finding)
+        for index, finding in enumerate(
+            ai_findings,
+            start=1,
+        ):
+            print()
+            print(
+                f"AI анализ {index}/{len(ai_findings)}:"
+            )
+            print(f"  Rule: {finding['rule']}")
+            print(f"  File: {finding['file']}")
+            print(f"  Line: {finding['line']}")
+            print(f"  Risk: {finding['risk']}")
 
-        if ai_result["success"]:
-            finding["ai_analysis"] = ai_result["analysis"]
-            finding["ai_provider"] = ai_result["provider"]
-            finding["ai_model"] = ai_result["model"]
+            ai_result = analyze_finding(finding)
 
-            print("  ✓ Qwen анализ завершён")
+            if ai_result["success"]:
+                finding["ai_analysis"] = ai_result["analysis"]
+                finding["ai_provider"] = ai_result["provider"]
+                finding["ai_model"] = ai_result["model"]
 
-        else:
-            finding["ai_analysis"] = None
-            finding["ai_error"] = ai_result["error"]
+                print("  ✓ Qwen анализ завершён")
 
-            print("  ✗ AI временно недоступен")
-            print(f"    {ai_result['error']}")
-
-            # Если получили rate limit,
-            # прекращаем дальнейшие AI-запросы.
-            if "429" in ai_result["error"]:
-                print()
-                print(
-                    "Получен HTTP 429. "
-                    "Останавливаем AI-запросы."
+            else:
+                error = ai_result.get(
+                    "error",
+                    "Неизвестная ошибка AI",
                 )
-                break
 
-    # ========================================
-    # 4. SAVE REPORT
-    # ========================================
+                print("  ✗ AI временно недоступен")
+                print(f"    {error}")
+
+                print()
+                print("STATUS: EMERGENCY")
+                print("Reason: AI model unavailable.")
+                print("Exit code: 2")
+
+                return 2
+
+    else:
+        print("[3/4] AI-анализ пропущен (--no-ai)")
 
     print()
     print("[4/4] Сохранение отчёта...")
 
-    report = {
-        "agent": "KMG Security AI Agent",
-        "ai_provider": "openrouter",
-        "ai_model": "qwen/qwen3.8-27b:free",
-        "semgrep_version": semgrep_result["semgrep_version"],
-        "summary": summary,
-        "findings": findings,
-    }
+    end_time = datetime.now(timezone.utc)
 
-    report_path = Path(
-        "security-reports/security-report.json"
-    )
-
-    report_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    report_path.write_text(
-        json.dumps(
-            report,
-            indent=4,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
+    report = generate_report(
+        ib_results=ib_results,
+        ib_summary=ib_summary,
+        semgrep_result=semgrep_result,
+        risk_result=risk_result,
+        start_time=start_time,
+        end_time=end_time,
+        target=target,
+        report_dir=report_dir,
     )
 
     print(
-        f"Отчёт сохранён: {report_path}"
+        "JSON отчёт: "
+        "security-reports/security-report.json"
     )
 
-    # ========================================
-    # FINAL SUMMARY
-    # ========================================
+    print(
+        "Markdown отчёт: "
+        "security-reports/security-report.md"
+    )
 
     print()
     print("========================================")
     print("           SECURITY SUMMARY")
     print("========================================")
 
-    print(f"Total:    {summary['total']}")
-    print(f"Critical: {summary['critical']}")
-    print(f"High:     {summary['high']}")
-    print(f"Medium:   {summary['medium']}")
-    print(f"Low:      {summary['low']}")
+    print(
+        f"ИБ requirements: "
+        f"{ib_summary['total_requirements']}"
+    )
+
+    print(
+        f"ИБ PASS:         "
+        f"{ib_summary['passed']}"
+    )
+
+    print(
+        f"ИБ VIOLATIONS:   "
+        f"{ib_summary['violations']}"
+    )
+
+    print(
+        f"ИБ parse errors: "
+        f"{ib_summary['parse_errors']}"
+    )
+
+    print()
+    print(f"Semgrep findings: {summary['total']}")
+    print(f"Critical:         {summary['critical']}")
+    print(f"High:             {summary['high']}")
+    print(f"Medium:           {summary['medium']}")
+    print(f"Low:              {summary['low']}")
+
+    print()
+    print(
+        f"Overall result:   "
+        f"{report['overall_result']}"
+    )
 
     print("========================================")
 
-    return True
+    return 0
 
 
 if __name__ == "__main__":
-    success = run_security_analysis()
+    use_ai = "--no-ai" not in sys.argv
 
-    if not success:
-        raise SystemExit(1)
+    exit_code = run_security_analysis(
+        use_ai=use_ai
+    )
 
+    sys.exit(exit_code)

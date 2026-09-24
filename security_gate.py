@@ -3,16 +3,23 @@ import sys
 from pathlib import Path
 
 
-REPORT_PATH = Path("security-reports/security-report.json")
+DEFAULT_REPORT_PATH = Path("security-reports/security-report.json")
 
 
 def main():
-    if not REPORT_PATH.exists():
+    report_path = (
+        Path(sys.argv[1])
+        if len(sys.argv) > 1
+        else DEFAULT_REPORT_PATH
+    )
+
+    if not report_path.exists():
         print("ERROR: Security report not found.")
+        print(f"Path: {report_path}")
         sys.exit(2)
 
     try:
-        with REPORT_PATH.open(
+        with report_path.open(
             "r",
             encoding="utf-8",
         ) as file:
@@ -57,6 +64,7 @@ def main():
     if parse_errors > 0:
         print("STATUS: EMERGENCY")
         print("Reason: Project parse errors.")
+        print("Exit code: 2")
         sys.exit(2)
 
     if violations > 0:
@@ -64,10 +72,12 @@ def main():
         print(
             "Reason: Information security violations detected."
         )
+        print("Exit code: 1")
         sys.exit(1)
 
     print("STATUS: PASSED")
     print("No information security violations detected.")
+    print("Exit code: 0")
     sys.exit(0)
 
 

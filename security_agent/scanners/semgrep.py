@@ -3,13 +3,14 @@ import subprocess
 from pathlib import Path
 
 
-def run_semgrep(target="."):
-    """
-    Запускает Semgrep и возвращает результаты в виде Python-словаря.
-    """
+def run_semgrep(
+    target=".",
+    report_dir="/tmp/kmg-security-reports",
+):
+    report_dir = Path(report_dir)
+    report_dir.mkdir(parents=True, exist_ok=True)
 
-    report_path = Path("security-reports/semgrep.json")
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "semgrep.json"
 
     command = [
         "semgrep",
@@ -45,7 +46,11 @@ def run_semgrep(target="."):
         }
 
     report_path.write_text(
-        json.dumps(data, indent=4, ensure_ascii=False),
+        json.dumps(
+            data,
+            indent=4,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
 
@@ -75,4 +80,5 @@ def run_semgrep(target="."):
         "semgrep_version": data.get("version"),
         "findings_count": len(findings),
         "results": findings,
+        "report_path": str(report_path),
     }
