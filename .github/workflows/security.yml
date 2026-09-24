@@ -4,18 +4,12 @@ on:
   push:
     branches:
       - "**"
-
   pull_request:
 
 jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-
-    env:
-      AI_PROVIDER: openrouter
-      AI_MODEL: qwen/qwen3.8-27b:free
-      AI_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -32,17 +26,23 @@ jobs:
           pip install -r requirements.txt
           pip install semgrep python-dotenv openai
 
-      - name: Run security agent
+      - name: Run Information Security Checks
         run: |
-          python -m security_agent.agent
+          python -m security_agent.checks.runner
+
+      - name: Run Security Agent
+        run: |
+          python -m security_agent.agent --no-ai
 
       - name: Run Security Gate
         run: |
           python security_gate.py
 
-      - name: Upload security report
+      - name: Upload Security Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: security-report
-          path: security-reports/security-report.json
+          name: security-reports
+          path: |
+            security-reports/security-report.json
+            security-reports/security-report.md
