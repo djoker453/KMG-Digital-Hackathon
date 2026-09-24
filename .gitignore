@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Django runtime
+runtime/
+*.sqlite3
+
+# Security reports
+security-reports/
+
+# Semgrep
+.semgrep/
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

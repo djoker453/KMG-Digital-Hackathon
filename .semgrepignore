@@ -1,0 +1,10 @@
+security-reports/
+.venv/
+.git/
+__pycache__/
+*.pyc
+
+# Third-party frontend libraries
+**/vendor/
+**/jquery*.js
+**/*-debug*.js
