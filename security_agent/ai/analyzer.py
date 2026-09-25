@@ -107,6 +107,7 @@ RECOMMENDATION:
                 },
             ],
             temperature=0.1,
+            max_tokens=2000
         )
 
         answer = response.choices[0].message.content
