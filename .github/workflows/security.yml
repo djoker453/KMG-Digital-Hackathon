@@ -29,7 +29,6 @@ jobs:
       - name: Run Information Security Checks
         run: |
           python -m security_agent.checks.runner
-      
 
        - name: Run Security Agent
         env:
