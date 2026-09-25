@@ -30,6 +30,49 @@ jobs:
         run: |
           python -m security_agent.checks.runner
 
+      - name: Test OpenRouter connection
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -z "$AI_API_KEY" ]; then
+            echo "ERROR: AI_API_KEY secret is not configured."
+            exit 1
+          fi
+
+          STATUS=$(curl -sS \
+            -o /tmp/openrouter.json \
+            -w "%{http_code}" \
+            -H "Authorization: Bearer $AI_API_KEY" \
+            "https://openrouter.ai/api/v1/models")
+
+          echo "OpenRouter HTTP status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: OpenRouter authentication or connection failed."
+            exit 1
+          fi
+
+          python - <<'PY'
+          import json
+
+          with open("/tmp/openrouter.json", encoding="utf-8") as file:
+              data = json.load(file)
+
+          model = "qwen/qwen3.8-27b:free"
+
+          found = any(
+              item.get("id") == model
+              for item in data.get("data", [])
+          )
+
+          print(f"Qwen model available: {found}")
+
+          if not found:
+              raise SystemExit(
+                  f"ERROR: Model {model} was not found in OpenRouter."
+              )
+          PY
+
       - name: Run Security Agent
         env:
           AI_PROVIDER: openrouter
