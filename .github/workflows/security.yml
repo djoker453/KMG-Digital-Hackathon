@@ -49,6 +49,6 @@ jobs:
         with:
           name: security-reports
           path: |
-            security-reports/security-report.json
-            security-reports/security-report.md
+            /tmp/kmg-security-reports/security-report.json
+            /tmp/kmg-security-reports/security-report.md
             /tmp/kmg-security-reports/semgrep.json
