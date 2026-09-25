@@ -29,9 +29,9 @@ jobs:
       - name: Run Information Security Checks
         run: |
           python -m security_agent.checks.runner
+      
 
-      - name: Run Security Agent
-              - name: Run Security Agent
+       - name: Run Security Agent
         env:
           AI_PROVIDER: openrouter
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
